@@ -1,0 +1,16 @@
+[
+  {"id": 1, "imie_nazwisko": "Anna Kowalska", "stanowisko": "starszy", "etat": 1.0},
+  {"id": 2, "imie_nazwisko": "Marek Nowak", "stanowisko": "starszy", "etat": 1.0},
+  {"id": 3, "imie_nazwisko": "Katarzyna Wiśniewska", "stanowisko": "starszy", "etat": 1.0},
+  {"id": 4, "imie_nazwisko": "Piotr Wójcik", "stanowisko": "starszy", "etat": 1.0},
+  {"id": 5, "imie_nazwisko": "Ewa Kamińska", "stanowisko": "starszy", "etat": 0.75},
+  {"id": 6, "imie_nazwisko": "Paweł Zieliński", "stanowisko": "starszy", "etat": 1.0},
+  {"id": 7, "imie_nazwisko": "Magdalena Szymańska", "stanowisko": "pracownik", "etat": 1.0},
+  {"id": 8, "imie_nazwisko": "Łukasz Woźniak", "stanowisko": "pracownik", "etat": 1.0},
+  {"id": 9, "imie_nazwisko": "Agnieszka Dąbrowska", "stanowisko": "pracownik", "etat": 1.0},
+  {"id": 10, "imie_nazwisko": "Michał Kozłowski", "stanowisko": "pracownik", "etat": 0.75},
+  {"id": 11, "imie_nazwisko": "Joanna Jankowska", "stanowisko": "pracownik", "etat": 1.0},
+  {"id": 12, "imie_nazwisko": "Krzysztof Mazur", "stanowisko": "pracownik", "etat": 0.5},
+  {"id": 13, "imie_nazwisko": "Natalia Kwiatkowska", "stanowisko": "młodszy", "etat": 1.0},
+  {"id": 14, "imie_nazwisko": "Bartosz Krawczyk", "stanowisko": "młodszy", "etat": 0.5}
+]

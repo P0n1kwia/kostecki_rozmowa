@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Grafik zmian</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body data-tryb="rano">
+  <header class="pasek">
+    <div class="nawigacja">
+      <button id="poprzedni" aria-label="Poprzedni miesiąc">‹</button>
+      <h1 id="tytul"></h1>
+      <button id="nastepny" aria-label="Następny miesiąc">›</button>
+    </div>
+    <div class="tryby" role="group" aria-label="Tryb zmiany">
+      <button data-zmiana="rano">Rano</button>
+      <button data-zmiana="wieczor">Wieczór</button>
+    </div>
+  </header>
+
+  <p id="komunikat" role="status"></p>
+  <div class="okno"><div id="siatka" class="siatka"></div></div>
+
+  <dialog id="wybor">
+    <h2 id="wybor-tytul"></h2>
+    <p id="wybor-blad"></p>
+    <ul id="wybor-lista"></ul>
+    <button id="wybor-zamknij">Zamknij</button>
+  </dialog>
+
+  <script src="/app.js"></script>
+</body>
+</html>
