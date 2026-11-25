@@ -1,3 +1,4 @@
+from datetime import date
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query, Response
@@ -5,15 +6,17 @@ from fastapi.staticfiles import StaticFiles
 
 from . import reguly, storage
 from .models import (
+    Dostepnosc,
     Nieobecnosc,
     Pracownik,
     PracownikCreate,
     Przydzial,
     PrzydzialCreate,
+    Zmiana,
 )
 
 app = FastAPI(title="Grafik zmian")
-PRAC, NIEOB, PRZYD = "pracownicy", "nieobecnosci", "przydzialy"
+PRAC, NIEOB, PRZYD, PREF = "pracownicy", "nieobecnosci", "przydzialy", "preferencje"
 
 
 # ---------- Pracownicy ----------
@@ -84,12 +87,11 @@ def przydzialy(
 @app.post("/api/przydzialy", response_model=Przydzial, status_code=201)
 def przypisz(dane: PrzydzialCreate):
     with storage.lock:  # sprawdzenie reguł i zapis muszą być jedną, nierozerwalną operacją
-        if not any(p["id"] == dane.pracownik_id for p in storage.load(PRAC)):
+        prac = next((p for p in storage.load(PRAC) if p["id"] == dane.pracownik_id), None)
+        if prac is None:
             raise HTTPException(404, "Nie znaleziono pracownika")
         rows = storage.load(PRZYD)
-        powod = reguly.powod_odmowy(
-            dane.pracownik_id, dane.data, dane.zmiana.value, rows, storage.load(NIEOB)
-        )
+        powod = reguly.powod_odmowy(prac, dane.data, dane.zmiana.value, rows, storage.load(NIEOB))
         if powod:
             raise HTTPException(409, powod)  # 409 Conflict = żądanie koliduje ze stanem danych
         nowy = {"id": storage.next_id(rows), **dane.model_dump(mode="json")}
@@ -107,6 +109,27 @@ def odepnij(przydzial_id: int):
             raise HTTPException(404, "Nie znaleziono przydziału")
         storage.save(PRZYD, reszta)
     return Response(status_code=204)
+
+
+# ---------- Dostępność: kolory + liczniki godzin dla okna wyboru ----------
+@app.get("/api/dostepnosc", response_model=list[Dostepnosc])
+def dostepnosc(data: date, zmiana: Zmiana):
+    with storage.lock:  # spójny odczyt wszystkich plików naraz
+        pracownicy, przydzialy = storage.load(PRAC), storage.load(PRZYD)
+        nieobecnosci, preferencje = storage.load(NIEOB), storage.load(PREF)
+    wynik = []
+    for p in pracownicy:
+        o = reguly.ocen(p, data, zmiana.value, przydzialy, nieobecnosci, preferencje)
+        wynik.append({
+            "pracownik_id": p["id"],
+            "kolor": o["kolor"],
+            "powody": o["czerwone"] + o["zolte"],
+            "godziny_tydzien": o["godziny_tydzien"],
+            "limit_tydzien": o["limit_tydzien"],
+            "godziny_miesiac": o["godziny_miesiac"],
+            "limit_miesiac": o["limit_miesiac"],
+        })
+    return wynik
 
 
 # Frontend montowany NA KOŃCU, bo mount("/") przechwytuje wszystkie ścieżki

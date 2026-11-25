@@ -3,9 +3,7 @@
 const DNI = ["Pn", "Wt", "Śr", "Cz", "Pt", "So", "Nd"];
 const MIESIACE = ["styczeń", "luty", "marzec", "kwiecień", "maj", "czerwiec",
   "lipiec", "sierpień", "wrzesień", "październik", "listopad", "grudzień"];
-const NAZWY_ZMIAN = { rano: "porannej", wieczor: "wieczornej" };
 const ETYKIETY_ZMIAN = { rano: "poranna", wieczor: "wieczorna" };
-const TYPY_NIEOBECNOSCI = { niedostepny: "niedostępny" };
 
 const teraz = new Date();
 const stan = {
@@ -13,7 +11,6 @@ const stan = {
   miesiac: teraz.getMonth(), // 0-11, jak w JS
   zmiana: "rano",
   pracownicy: [],
-  nieobecnosci: [],
   przydzialy: [], // tylko wyświetlany miesiąc
 };
 
@@ -63,17 +60,6 @@ function skrot(imieNazwisko) {
   return nazwisko ? `${imie} ${nazwisko[0]}.` : imie;
 }
 
-// Powód, dla którego pracownika nie wolno dodać (lub null). To odbicie reguł z backendu
-// - służy tylko do wyszarzenia przycisków; ostatnie słowo zawsze ma serwer.
-function powodBlokady(pid, dzien, zmiana) {
-  // Daty ISO "RRRR-MM-DD" porównuje się zwykłym <= na tekstach: kolejność alfabetyczna = chronologiczna
-  const n = stan.nieobecnosci.find((n) => n.pracownik_id === pid && n.od <= dzien && dzien <= n.do);
-  if (n) return `nieobecny (${TYPY_NIEOBECNOSCI[n.typ] || n.typ})`;
-  const p = stan.przydzialy.find((p) => p.pracownik_id === pid && p.data === dzien);
-  if (p) return p.zmiana === zmiana ? "już przypisany" : `już na zmianie ${NAZWY_ZMIAN[p.zmiana]}`;
-  return null;
-}
-
 // ---------- Rysowanie ----------
 function render() {
   document.body.dataset.tryb = stan.zmiana; // CSS reaguje na ten atrybut
@@ -110,10 +96,10 @@ function komorka(d) {
   if (!swoj) return kom; // dni z sąsiednich miesięcy tylko dopełniają siatkę
 
   const kafle = el("div", { class: "kafle" });
-  // Widać obie zmiany naraz: najpierw poranna, potem wieczorna, w obrębie zmiany wg id pracownika.
+  // Widok pokazuje tylko wybraną zmianę: przy "Wieczór" znikają poranni i odwrotnie.
   const dzisiejsze = stan.przydzialy
-    .filter((p) => p.data === dzien)
-    .sort((a, b) => (a.zmiana === b.zmiana ? a.pracownik_id - b.pracownik_id : a.zmiana === "rano" ? -1 : 1));
+    .filter((p) => p.data === dzien && p.zmiana === stan.zmiana)
+    .sort((a, b) => a.pracownik_id - b.pracownik_id);
   for (const p of dzisiejsze) {
     const prac = pracownik(p.pracownik_id);
     // Klasa "rano"/"wieczor" pochodzi z samego przydziału (wartość z enuma po stronie serwera),
@@ -136,24 +122,43 @@ function komorka(d) {
 }
 
 // ---------- Okno wyboru pracownika ----------
-function otworzWybor(dzien) {
+let numerZapytania = 0; // spóźniona odpowiedź dla poprzedniego otwarcia okna nie może nadpisać listy
+
+async function otworzWybor(dzien) {
   const [r, m, dd] = dzien.split("-");
-  $("wybor-tytul").textContent = `${Number(dd)}.${m}.${r} - zmiana ${stan.zmiana === "rano" ? "poranna" : "wieczorna"}`;
+  $("wybor-tytul").textContent = `${Number(dd)}.${m}.${r} - zmiana ${ETYKIETY_ZMIAN[stan.zmiana]}`;
   pokazBlad("");
   const lista = $("wybor-lista");
+  lista.replaceChildren(el("li", { class: "ladowanie" }, "Ładowanie..."));
+  $("wybor").showModal(); // natywny <dialog>: ciemne tło, Esc i focus trap za darmo
+
+  // Kolory i liczniki godzin liczy serwer (jedno źródło reguł; to samo sprawdza przy zapisie).
+  const moj = ++numerZapytania;
+  let oceny;
+  try {
+    oceny = await api(`/api/dostepnosc?data=${dzien}&zmiana=${stan.zmiana}`);
+  } catch (e) {
+    if (moj === numerZapytania) { lista.replaceChildren(); pokazBlad(e.message); }
+    return;
+  }
+  if (moj !== numerZapytania) return;
+
   lista.replaceChildren();
-  for (const p of stan.pracownicy) {
-    const powod = powodBlokady(p.id, dzien, stan.zmiana);
+  for (const o of oceny) {
+    const p = pracownik(o.pracownik_id);
+    if (!p) continue;
     lista.append(el("li", {}, el("button", {
-      class: "osoba",
-      disabled: !!powod,
+      class: `osoba ${o.kolor}`,
+      disabled: o.kolor === "czerwony", // ograniczenie twarde - serwer i tak odpowiedziałby 409
       onclick: () => przypisz(dzien, p.id),
     }, [
-      el("span", {}, p.imie_nazwisko),
-      el("small", {}, powod || `${p.stanowisko}, etat ${p.etat}`),
+      el("span", { class: "osoba-gora" }, [
+        el("span", {}, p.imie_nazwisko),
+        el("small", {}, `tydz. ${o.godziny_tydzien}/${o.limit_tydzien} h · mies. ${o.godziny_miesiac}/${o.limit_miesiac} h`),
+      ]),
+      el("small", { class: "powody" }, o.powody.length ? o.powody.join(" · ") : `${p.stanowisko}, etat ${p.etat}`),
     ])));
   }
-  $("wybor").showModal(); // natywny <dialog>: ciemne tło, Esc i focus trap za darmo
 }
 
 // ---------- Komunikacja z API ----------
@@ -209,7 +214,7 @@ for (const b of document.querySelectorAll(".tryby button")) {
 
 (async () => {
   try {
-    [stan.pracownicy, stan.nieobecnosci] = await Promise.all([api("/api/pracownicy"), api("/api/nieobecnosci")]);
+    stan.pracownicy = await api("/api/pracownicy");
     await wczytajPrzydzialy();
   } catch (e) {
     pokazBlad(e.message);

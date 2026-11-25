@@ -1,5 +1,6 @@
 from datetime import date
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -50,3 +51,15 @@ class PrzydzialCreate(BaseModel):
 
 class Przydzial(PrzydzialCreate):
     id: int
+
+
+class Dostepnosc(BaseModel):
+    """Ocena kandydata na daną zmianę - z niej UI bierze kolor i liczniki godzin."""
+
+    pracownik_id: int
+    kolor: Literal["zielony", "zolty", "czerwony"]  # czerwony = nie wolno, żółty = preferencja
+    powody: list[str]  # najpierw ograniczenia (czerwone), potem preferencje (żółte)
+    godziny_tydzien: float  # ile już ma w tygodniu (pon-nd), bez tej zmiany
+    limit_tydzien: float
+    godziny_miesiac: float  # ile już ma w miesiącu, bez tej zmiany
+    limit_miesiac: float
